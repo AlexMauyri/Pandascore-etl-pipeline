@@ -1,9 +1,25 @@
-FROM apache/airflow:3.2.2-python3.14
+FROM apache/airflow:3.2.2-python3.14 AS base
 
 WORKDIR /airflow-pipeline
 
 COPY requirements/ requirements/
-
 RUN pip install --no-cache-dir -r requirements/prod.txt
 
 ENV AIRFLOW_HOME=/opt/airflow
+
+
+FROM base AS test
+
+RUN pip install --no-cache-dir -r requirements/test.txt
+
+COPY dags/ /airflow-pipeline/dags
+COPY etl/ /airflow-pipeline/etl
+COPY sql/ /airflow-pipeline/sql
+COPY tests/ /airflow-pipeline/tests
+
+ENV PYTHONPATH=/airflow-pipeline
+
+ENTRYPOINT ["pytest"]
+CMD ["tests", "-v"]
+
+FROM base AS production

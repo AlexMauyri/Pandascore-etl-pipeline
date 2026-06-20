@@ -2,6 +2,7 @@ x-airflow-common: &airflow-common
   build:
     context: .
     dockerfile: Dockerfile.airflow
+    target: production
   env_file:
     - .env
   volumes:
