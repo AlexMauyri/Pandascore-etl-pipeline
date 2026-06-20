@@ -1,0 +1,22 @@
+<clickhouse>
+  <logger>
+    <level>information</level>
+    <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+    <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+    <size>100M</size>
+    <count>10</count>
+    <console>1</console>
+  </logger>
+
+  <merge_tree>
+    <max_parts_in_total>10000</max_parts_in_total>
+    <max_parts_to_merge_at_once>100</max_parts_to_merge_at_once>
+    <merge_max_block_size>8192</merge_max_block_size>
+  </merge_tree>
+
+
+  <listen_host>0.0.0.0</listen_host>
+  <http_port>8123</http_port>
+  <tcp_port>9000</tcp_port>
+
+</clickhouse>

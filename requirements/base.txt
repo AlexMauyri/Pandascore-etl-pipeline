@@ -1,0 +1,7 @@
+pandas
+requests
+tenacity
+pydantic
+sqlalchemy
+psycopg2-binary
+pandascore-client

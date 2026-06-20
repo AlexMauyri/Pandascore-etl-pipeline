@@ -1,0 +1,231 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  env_file:
+    - .env
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./etl:/opt/airflow/etl
+    - ./sql:/opt/airflow/sql
+    - ./logs:/opt/airflow/logs
+  depends_on:
+    postgres-airflow:
+      condition: service_healthy
+  restart: always
+  user: "${AIRFLOW_UID:-50000}:0"
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3-alpine
+    container_name: clickhouse_dwh
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      TZ: UTC
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+      nproc:
+        soft: 65535
+        hard: 65535
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./configs/clickhouse_config/config.d:/etc/clickhouse-server/config.d:ro
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    networks:
+      - etl_network
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  postgres-airflow:
+    image: postgres:18.4-alpine
+    container_name: airflow_metadata_db
+    environment:
+      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
+      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+      TZ: ${TZ}
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql
+      - ./sql/init-airflow.sql:/docker-entrypoint-initdb.d/init-airflow.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - etl_network
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow_init
+    entrypoint: /bin/bash
+    command: >
+      -c "
+        airflow db migrate
+      "
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - etl_network
+
+  airflow-api-server:
+    <<: *airflow-common
+    container_name: airflow_webserver
+    command: airflow api-server
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - etl_network
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow_scheduler
+    command: airflow scheduler
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --limit 1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - etl_network
+
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: airflow_triggerer
+    command: airflow triggerer
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type TriggererJob --limit 1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - etl_network
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: airflow_dag_processor
+    command: airflow dag-processor
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type DagProcessorJob --limit 1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - etl_network
+
+  redis_rate_limiter:
+    image: redis:8.8-alpine
+    container_name: redis_rate_limiter
+    command: >
+      sh -c "
+        redis-server --requirepass ${REDIS_PASSWORD} --bind 0.0.0.0 --protected-mode yes
+      "
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      TZ: UTC
+    networks:
+      - etl_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  superset:
+    build:
+      context: .
+      dockerfile: Dockerfile.superset
+    container_name: superset
+    env_file:
+      - .env
+    environment:
+      SUPERSET__SQLALCHEMY_DATABASE_URI: ${SUPERSET__SQLALCHEMY_DATABASE_URI}
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_CONFIG_PATH: /app/superset_config.py
+      RATELIMIT_STORAGE_URI: redis://:${REDIS_PASSWORD}@redis_rate_limiter:${REDIS_PORT}/${REDIS_DB}
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      redis_rate_limiter:
+        condition: service_healthy
+    volumes:
+      - superset_data:/app/superset_home
+      - ./superset/dashboards:/app/dashboards
+      - ./configs/superset_config.py:/app/superset_config.py:ro
+    ports:
+      - "8088:8088"
+    command: >
+      sh -c "
+        superset db upgrade &&
+        superset init &&
+        superset fab create-admin --username ${SUPERSET_ADMIN_USER} --password ${SUPERSET_ADMIN_PASSWORD} --firstname Admin --lastname User --email ${SUPERSET_ADMIN_EMAIL} || true &&
+        gunicorn -w 4 -k gthread --threads 4 -b 0.0.0.0:8088 --timeout 120 --limit-request-line 0 --limit-request-field_size 0 'superset.app:create_app()'
+      "
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: always
+    networks:
+      - etl_network
+
+volumes:
+  clickhouse_data:
+    name: etl_clickhouse_data
+  postgres_airflow_data:
+    name: airflow_postgres_data
+  superset_data:
+    name: superset_data
+
+
+networks:
+  etl_network:
+    name: etl_network
+    driver: bridge

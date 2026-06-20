@@ -1,0 +1,9 @@
+FROM apache/airflow:3.2.2-python3.14
+
+WORKDIR /airflow-pipeline
+
+COPY requirements/ requirements/
+
+RUN pip install --no-cache-dir -r requirements/prod.txt
+
+ENV AIRFLOW_HOME=/opt/airflow
