@@ -1,7 +1,8 @@
 import requests
 import os
 import logging
-from requests import RequestException
+from requests import RequestException, Response
+from typing import Any, Dict, List
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -25,7 +26,7 @@ BASE_URL = "https://api.pandascore.co"
 TIMEOUT = 10
 
 
-def is_retryable_status(response):
+def is_retryable_status(response: Response) -> bool:
     return response.status_code == 429 or 500 <= response.status_code < 600
 
 
@@ -35,11 +36,11 @@ def is_retryable_status(response):
     retry=(retry_if_exception_type(RequestException) | retry_if_result(is_retryable_status)),
     before_sleep=before_sleep_log(logger, logging.WARNING),
 )
-def __fetch_page(url):
+def __fetch_page(url: str) -> Response:
     return requests.get(url, headers=HEADERS, timeout=TIMEOUT)
 
 
-def __fetch_all_pages(url, per_page):
+def __fetch_all_pages(url: str, per_page: int) -> List[Dict[str, Any]]:
     per_page_filter = f"per_page={per_page}"
     all_data = []
     page = 1
@@ -78,7 +79,7 @@ def __fetch_all_pages(url, per_page):
     return all_data
 
 
-def extract_matches(begin_date, end_date, per_page=100):
+def extract_matches(begin_date: str, end_date: str, per_page: int = 100) -> List[Dict[str, Any]]:
     logger.info(f"Начало извлечения матчей с {begin_date} по {end_date}, per_page={per_page}")
     range_filter = f"range[begin_at]={begin_date},{end_date}"
     matches_url = f"{BASE_URL}/matches?{range_filter}"

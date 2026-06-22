@@ -32,7 +32,6 @@ def _dedup_by_id(items: List[dict]) -> List[dict]:
 
 
 def _log_first_object(entity_name: str, objects: List):
-    """Логирует первый объект списка для проверки."""
     if objects:
         logger.info(f"[{entity_name}] Первый объект: {objects[0]}")
     else:
@@ -143,7 +142,7 @@ def parse_teams(raw_matches: List[dict]) -> List[Team]:
             id=raw["id"],
             name=raw.get("name", ""),
             slug=raw.get("slug"),
-            acronym=raw.get("acronym"),
+            acronym=raw.get("acronym", ""),
             videogame_id=team_to_videogame.get(raw["id"])
         )
         for raw in raw_list

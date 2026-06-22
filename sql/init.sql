@@ -37,7 +37,7 @@ CREATE TABLE etl.teams (
     id UInt32,
     name String,
     slug String,
-    acronym String,
+    acronym Nullable(String),
     videogame_id UInt32
 ) ENGINE = ReplacingMergeTree()
 ORDER BY id;

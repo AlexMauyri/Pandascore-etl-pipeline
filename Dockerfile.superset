@@ -1,4 +1,4 @@
-FROM apache/superset:6.0.0
+FROM apache/superset:6.0.0-py312
 
 USER root
 
@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y \
 
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | /app/.venv/bin/python3
 
-RUN python3 -m pip install --no-cache-dir psycopg2-binary redis clickhouse-connect
+COPY pyproject.toml uv.lock ./
+
+RUN pip install --no-cache-dir -e .[superset] 
 
 USER superset
 
