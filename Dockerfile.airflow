@@ -1,12 +1,21 @@
 FROM apache/airflow:3.2.2-python3.14 AS base
 
-WORKDIR /airflow-pipeline
+ENV AIRFLOW_HOME=/opt/airflow
+WORKDIR $AIRFLOW_HOME
 
 COPY requirements/ requirements/
 RUN pip install --no-cache-dir -r requirements/prod.txt
 
-ENV AIRFLOW_HOME=/opt/airflow
+COPY common/ common/
+COPY etl/ etl/
+COPY dags/ dags/
+COPY sql/ sql/
+COPY configs/ configs/
+COPY pyproject.toml uv.lock ./
 
+ENV PYTHONPATH=$AIRFLOW_HOME
+
+RUN pip install -e .
 
 FROM base AS test
 
@@ -15,10 +24,9 @@ RUN pip install --no-cache-dir -r requirements/test.txt
 COPY dags/ /airflow-pipeline/dags
 COPY etl/ /airflow-pipeline/etl
 COPY sql/ /airflow-pipeline/sql
-COPY tests/ /airflow-pipeline/tests
 
 ENV PYTHONPATH=/airflow-pipeline
-
+COPY tests/ /airflow-pipeline/tests
 ENTRYPOINT ["pytest"]
 CMD ["tests", "-v"]
 

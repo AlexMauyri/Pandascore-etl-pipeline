@@ -8,6 +8,8 @@ x-airflow-common: &airflow-common
   volumes:
     - ./dags:/opt/airflow/dags
     - ./etl:/opt/airflow/etl
+    - ./common:/opt/airflow/common 
+    - ./configs:/opt/airflow/configs 
     - ./sql:/opt/airflow/sql
     - ./logs:/opt/airflow/logs
   depends_on:
