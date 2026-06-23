@@ -5,10 +5,10 @@ from etl.models import (
     Videogame, League, Serie, Tournament, Team,
     Match, MatchOpponent
 )
+
 from common.logging_config import setup_logging
 
 setup_logging()
-
 logger = logging.getLogger(__name__)
 
 def _parse_datetime(value) -> datetime | None:

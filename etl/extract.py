@@ -11,10 +11,10 @@ from tenacity import (
     retry_if_result,
     before_sleep_log,
 )
+
 from common.logging_config import setup_logging
 
 setup_logging()
-
 logger = logging.getLogger(__name__)
 
 PANDASCORE_TOKEN = os.getenv("PANDASCORE_TOKEN")

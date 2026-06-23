@@ -17,7 +17,10 @@ dependencies = [
 airflow = [
     "tenacity>=9.1.4",
     "requests>=2.34.2",
+    "minio>=7.2.20",
     "pydantic>=2.13.4",
+    "apache-airflow>=3.1.8",
+    "apache-airflow-providers-standard>=1.14.0",
 ]
 superset = [
     "redis>=8.0.0",
@@ -33,4 +36,4 @@ test = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["common*", "etl*"]
+include = ["common*", "etl*", "dags*"]

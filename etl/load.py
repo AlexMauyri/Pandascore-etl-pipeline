@@ -5,6 +5,9 @@ from typing import Dict, List, Any
 import clickhouse_connect
 from clickhouse_connect.driver.client import Client
 
+from common.logging_config import setup_logging
+
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -70,15 +73,11 @@ class ClickHouseLoader:
         )
         logger.info("Подключение установлено")
 
-    def _model_to_dict(self, model: Any) -> dict:
-        return model.model_dump(mode="json", exclude_none=True)
-
-    def _insert_batch(self, table_name: str, models: List[Any]) -> int:
-        if not models:
+    def _insert_batch(self, table_name: str, dicts: List[Dict]) -> int:
+        if not dicts:
             logger.warning(f"[{table_name}] Нет данных для загрузки")
             return 0
 
-        dicts = [self._model_to_dict(m) for m in models]
         column_names = list(dicts[0].keys())
 
         data = []
