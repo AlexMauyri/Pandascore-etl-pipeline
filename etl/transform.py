@@ -142,7 +142,7 @@ def parse_teams(raw_matches: List[dict]) -> List[Team]:
             id=raw["id"],
             name=raw.get("name", ""),
             slug=raw.get("slug"),
-            acronym=raw.get("acronym", ""),
+            acronym=raw.get("acronym"),
             videogame_id=team_to_videogame.get(raw["id"])
         )
         for raw in raw_list
