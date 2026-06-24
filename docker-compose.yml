@@ -5,13 +5,12 @@ x-airflow-common: &airflow-common
     target: production
   env_file:
     - .env
-  environment:
-    - AIRFLOW__API__BASE_URL=http://airflow-api-server:8080
   volumes:
     - ./dags:/opt/airflow/dags
     - ./etl:/opt/airflow/etl
     - ./common:/opt/airflow/common 
-    - ./configs:/opt/airflow/configs 
+    - ./configs:/opt/airflow/configs
+    - ./configs/webserver_config.py:/opt/airflow/webserver_config.py:ro
     - ./sql:/opt/airflow/sql
     - ./logs:/opt/airflow/logs
   depends_on:
@@ -209,13 +208,11 @@ services:
       context: .
       dockerfile: Dockerfile.superset
     container_name: superset
-    env_file:
-      - .env
     environment:
       SUPERSET__SQLALCHEMY_DATABASE_URI: ${SUPERSET__SQLALCHEMY_DATABASE_URI}
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
       SUPERSET_CONFIG_PATH: /app/superset_config.py
-      RATELIMIT_STORAGE_URI: redis://:${REDIS_PASSWORD}@redis_rate_limiter:${REDIS_PORT}/${REDIS_DB}
+      REDIS_URL: ${REDIS_URL}
     depends_on:
       postgres-airflow:
         condition: service_healthy
@@ -253,7 +250,6 @@ volumes:
     name: superset_data
   minio_data:
     name: minio_data
-
 
 networks:
   etl_network:

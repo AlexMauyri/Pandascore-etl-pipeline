@@ -1,0 +1,3 @@
+import os
+
+RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI")
